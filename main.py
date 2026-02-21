@@ -2,8 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-import os
-import requests
+from playwright.sync_api import sync_playwright
 from datetime import date, timedelta
 from bs4 import BeautifulSoup
 
@@ -28,58 +27,46 @@ async def home():
 def get_today():
     today = date.today()
     tomorrow = today + timedelta(days=1)
-
     scraped = scrape_tips()
-
     return {
         "today_date": today.strftime("%A %d %B %Y"),
         "future_date": tomorrow.strftime("%A %d %B %Y"),
         "today_races": scraped,
-        "future_races": [],
-        "log": "Scraping ran - check for horses below"
+        "future_races": []
     }
 
 def scrape_tips():
     races = []
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-        r = requests.get("https://gg.co.uk/tips/today/", headers=headers, timeout=15)
-        soup = BeautifulSoup(r.text, 'html.parser')
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto("https://gg.co.uk/tips/today/", timeout=60000)
+            page.wait_for_load_state("networkidle")
+            html = page.content()
+            soup = BeautifulSoup(html, 'html.parser')
 
-        # Broader search for horse names (look for patterns like "Horse to win" or "@ odds")
-        potential_horses = soup.find_all(['span', 'a', 'p', 'div', 'li'], string=lambda t: t and any(word in t.lower() for word in ['horse', 'runner', 'to win', '@', 'odds', 'tip', 'nap']))
-        for el in potential_horses[:5]:
-            text = el.text.strip()
-            if len(text) < 5 or " " not in text:
-                continue
-            horse = text.split(' ')[0].strip() + " " + text.split(' ')[1].strip() if len(text.split()) > 1 else text[:30]
-            races.append({
-                "time": "TBD",
-                "track": "GG Tips",
-                "horse": horse,
-                "odds": "TBD",
-                "ai_score": 80,
-                "explanation": "Live scraped potential tip from GG.co.uk (text match)",
-                "highlighted": True
-            })
-
-        if not races:
-            races.append({
-                "horse": "No tips found",
-                "odds": "N/A",
-                "ai_score": 0,
-                "explanation": "No matching text patterns on GG - page may be JS-heavy or selector needs update (2026 version)",
-                "highlighted": False
-            })
+            # 2026 GG tip selector (broad match)
+            tip_blocks = soup.find_all(['div', 'article'], attrs={"class": lambda x: x and ('tip' in x.lower() or 'bet' in x.lower() or 'selection' in x.lower())})
+            for block in tip_blocks[:5]:
+                horse = block.find(['span', 'a'], string=lambda t: t and 'horse' in t.lower())
+                horse_text = horse.text.strip() if horse else "Unknown Horse"
+                races.append({
+                    "time": "TBD",
+                    "track": "GG Tips",
+                    "horse": horse_text,
+                    "odds": "TBD",
+                    "ai_score": 80,
+                    "explanation": "Live scraped with Playwright from GG.co.uk",
+                    "highlighted": True
+                })
+            browser.close()
     except Exception as e:
         races.append({
             "horse": "Scraping Error",
-            "odds": "N/A",
-            "ai_score": 0,
             "explanation": str(e)[:150],
             "highlighted": False
         })
-
     return races
 
 if __name__ == "__main__":
