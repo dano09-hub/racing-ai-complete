@@ -43,32 +43,51 @@ def scrape_tips():
     races = []
     try:
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-        r = requests.get("https://gg.co.uk/tips/today/", headers=headers, timeout=15)
+        
+        # TipMeerkat (easier to scrape, public tips)
+        r = requests.get("https://tipmeerkat.com/latest-tips-picks", headers=headers, timeout=15)
         soup = BeautifulSoup(r.text, 'html.parser')
-
-        # Broader 2026 GG selector - look for any text with horse-like patterns
-        potential_tips = soup.find_all(['div', 'p', 'span', 'a'], string=lambda t: t and any(word in t.lower() for word in ['horse', 'runner', 'to win', 'nap', '@', 'odds', 'tip']))
-        for el in potential_tips[:5]:
+        
+        # TipMeerkat selector - look for horse/tip patterns
+        tip_blocks = soup.find_all(['div', 'p', 'span'], string=lambda t: t and any(word in t.lower() for word in ['horse', 'runner', 'tip', 'nap', '@', 'odds']))
+        for el in tip_blocks[:5]:
             text = el.text.strip()
-            if len(text) < 10 or " " not in text:
+            if len(text) < 10:
                 continue
             horse = text.split(' ')[0] + " " + text.split(' ')[1] if len(text.split()) > 1 else text[:30]
             races.append({
                 "time": "TBD",
-                "track": "GG Tips",
+                "track": "TipMeerkat",
                 "horse": horse,
                 "odds": "TBD",
                 "ai_score": 80,
-                "explanation": "Live scraped potential tip from GG.co.uk (text pattern match)",
+                "explanation": "Live scraped tip from TipMeerkat",
                 "highlighted": True
             })
+
+        if not races:
+            # Fallback to GG
+            r = requests.get("https://gg.co.uk/tips/today/", headers=headers, timeout=15)
+            soup = BeautifulSoup(r.text, 'html.parser')
+            tip_blocks = soup.find_all(['div', 'p', 'span'], string=lambda t: t and 'horse' in t.lower())
+            for el in tip_blocks[:3]:
+                horse = el.text.strip()[:30]
+                races.append({
+                    "time": "TBD",
+                    "track": "GG Tips",
+                    "horse": horse,
+                    "odds": "TBD",
+                    "ai_score": 75,
+                    "explanation": "Fallback scraped from GG",
+                    "highlighted": False
+                })
 
         if not races:
             races.append({
                 "horse": "No tips found",
                 "odds": "N/A",
                 "ai_score": 0,
-                "explanation": "No matching text patterns on GG - page may be JS-heavy (try TipMeerkat next)",
+                "explanation": "No matching patterns on TipMeerkat or GG - sites may be JS-heavy (2026 version)",
                 "highlighted": False
             })
     except Exception as e:
