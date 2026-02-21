@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from bs4 import BeautifulSoup
 from requests_html import HTMLSession
 import time
+import random
 
 app = FastAPI(title="Racing AI")
 
@@ -33,39 +34,49 @@ def get_today():
     return {
         "today_date": today.strftime("%A %d %B %Y"),
         "future_date": tomorrow.strftime("%A %d %B %Y"),
-        "today_races": [],  # populated by scrape
+        "today_races": [],  # populated after scrape
         "future_races": []
     }
 
 @app.get("/api/scrape")
 def scrape_live():
-    log = ["🚀 Starting scraping with requests-html..."]
+    log = ["🚀 Starting live scraping with requests-html..."]
 
     session = HTMLSession()
 
-    # Example: The Racing API (use your keys from env)
+    # The Racing API
     try:
         user = os.getenv('THE_RACING_API_USER')
         pw = os.getenv('THE_RACING_API_PASS')
         if user and pw:
-            r = requests.get("https://api.theracingapi.com/v1/racecards/free?day=today&region_codes=gb,ire", auth=(user, pw), timeout=12)
+            r = session.get("https://api.theracingapi.com/v1/racecards/free?day=today&region_codes=gb,ire", auth=(user, pw), timeout=12)
             if r.ok:
                 log.append("✅ The Racing API: racecards loaded")
-    except:
-        log.append("⚠️ The Racing API failed")
+            else:
+                log.append(f"⚠️ The Racing API status: {r.status_code}")
+        else:
+            log.append("⚠️ Missing The Racing API credentials")
+    except Exception as e:
+        log.append(f"⚠️ The Racing API error: {str(e)[:100]}")
 
-    # TipMeerkat example
+    # TipMeerkat
     try:
-        r = session.get("https://tipmeerkat.com/latest-tips-picks")
-        r.html.render(timeout=15, sleep=2)  # renders JS
+        r = session.get("https://tipmeerkat.com/latest-tips-picks", timeout=15)
+        r.html.render(timeout=20, sleep=2)
         soup = BeautifulSoup(r.html.html, 'html.parser')
         log.append("✅ TipMeerkat scraped")
     except Exception as e:
-        log.append(f"⚠️ TipMeerkat failed: {str(e)[:80]}")
+        log.append(f"⚠️ TipMeerkat error: {str(e)[:100]}")
 
-    # Add more sites (GG, OLBG, etc.) the same way
+    # GG tips
+    try:
+        r = session.get("https://gg.co.uk/tips/today/", timeout=15)
+        r.html.render(timeout=20, sleep=2)
+        log.append("✅ GG tips scraped")
+    except Exception as e:
+        log.append(f"⚠️ GG error: {str(e)[:100]}")
 
-    log.append("✅ Scraping complete")
+    log.append("✅ All scraping finished")
 
     return {"status": "success", "message": "\n".join(log)}
 
