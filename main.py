@@ -3,8 +3,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import requests
 from datetime import date, timedelta
-from playwright.sync_api import sync_playwright
+from bs4 import BeautifulSoup
+from requests_html import HTMLSession
+import time
 
 app = FastAPI(title="Racing AI")
 
@@ -30,30 +33,39 @@ def get_today():
     return {
         "today_date": today.strftime("%A %d %B %Y"),
         "future_date": tomorrow.strftime("%A %d %B %Y"),
-        "today_races": [],
+        "today_races": [],  # populated by scrape
         "future_races": []
     }
 
 @app.get("/api/scrape")
 def scrape_live():
-    log = ["🚀 Starting Playwright scraping..."]
+    log = ["🚀 Starting scraping with requests-html..."]
 
+    session = HTMLSession()
+
+    # Example: The Racing API (use your keys from env)
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            
-            # Example: scrape TipMeerkat (replace with your sites)
-            page.goto("https://tipmeerkat.com/latest-tips-picks", timeout=30000)
-            page.wait_for_load_state("networkidle")
-            log.append("✅ TipMeerkat scraped with Playwright")
-            
-            # Add more sites here (GG, OLBG, etc.)
-            browser.close()
-        
-        log.append("✅ All scraping complete!")
+        user = os.getenv('THE_RACING_API_USER')
+        pw = os.getenv('THE_RACING_API_PASS')
+        if user and pw:
+            r = requests.get("https://api.theracingapi.com/v1/racecards/free?day=today&region_codes=gb,ire", auth=(user, pw), timeout=12)
+            if r.ok:
+                log.append("✅ The Racing API: racecards loaded")
+    except:
+        log.append("⚠️ The Racing API failed")
+
+    # TipMeerkat example
+    try:
+        r = session.get("https://tipmeerkat.com/latest-tips-picks")
+        r.html.render(timeout=15, sleep=2)  # renders JS
+        soup = BeautifulSoup(r.html.html, 'html.parser')
+        log.append("✅ TipMeerkat scraped")
     except Exception as e:
-        log.append(f"⚠️ Playwright error: {str(e)[:100]}")
+        log.append(f"⚠️ TipMeerkat failed: {str(e)[:80]}")
+
+    # Add more sites (GG, OLBG, etc.) the same way
+
+    log.append("✅ Scraping complete")
 
     return {"status": "success", "message": "\n".join(log)}
 
