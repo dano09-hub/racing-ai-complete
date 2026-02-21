@@ -1,8 +1,66 @@
 <!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>Racing AI</title><script src="https://cdn.tailwindcss.com"></script></head>
-<body class="bg-gray-950 text-white p-6">
-<h1 class="text-4xl font-bold">🏇 Racing AI - Complete</h1>
-<p class="mt-4">Your full system is ready. Connect this URL to your phone home screen as PWA.</p>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Racing AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#111827">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body class="bg-gray-950 text-white min-h-screen p-4">
+    <div class="max-w-2xl mx-auto">
+        <!-- Executive Summary -->
+        <div class="bg-green-900 rounded-3xl p-6 mb-8">
+            <h1 class="text-3xl font-bold flex items-center gap-2">🌟 Daily Standout Bet</h1>
+            <p class="text-xl mt-2">Golden Arrow @ 4.2 (AI Score 89)</p>
+            <p class="text-sm opacity-75 mt-1">🎯 Trainer single-runner + 🕶️ First-time headgear + 🏁 Low draw</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+            <button onclick="filterAll()" class="px-6 py-2 bg-white text-black rounded-2xl font-medium">All Races</button>
+            <button onclick="filterHigh()" class="px-6 py-2 bg-green-600 rounded-2xl font-medium">🔥 High Confidence</button>
+            <button onclick="filterValue()" class="px-6 py-2 bg-amber-600 rounded-2xl font-medium">💎 Value Bets</button>
+        </div>
+
+        <!-- Race Cards will appear here via JS (placeholder for now) -->
+        <div id="races" class="space-y-6">
+            <!-- Example race card -->
+            <div class="bg-gray-900 rounded-3xl p-5">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <span class="text-green-400 font-medium">14:30 Ascot</span>
+                        <span class="ml-3 text-xs opacity-60">Soft • 8 runners</span>
+                    </div>
+                    <span class="text-xs bg-gray-800 px-3 py-1 rounded-full">94% data</span>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between bg-gray-800 rounded-2xl p-4">
+                        <div>
+                            <span class="font-bold">Lightning Strike 🔥</span><br>
+                            <span class="text-sm opacity-70">ML 71% • 9/11 tipsters</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-2xl font-bold">4.8</span><br>
+                            <span class="text-xs text-green-400">+38% edge</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 text-center text-xs opacity-50">
+            Last updated: just now • Data from 7 sources
+        </div>
+    </div>
+
+    <script>
+        function filterAll() { alert("All races shown (full version coming soon)"); }
+        function filterHigh() { alert("High confidence only"); }
+        function filterValue() { alert("Value bets only"); }
+    </script>
 </body>
 </html>
