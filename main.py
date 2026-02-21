@@ -35,28 +35,41 @@ def get_today():
         "today_date": today.strftime("%A %d %B %Y"),
         "future_date": tomorrow.strftime("%A %d %B %Y"),
         "today_races": scraped,
-        "future_races": []
+        "future_races": [],
+        "log": "Scraping ran - check for horses below"
     }
 
 def scrape_tips():
     races = []
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
         r = requests.get("https://gg.co.uk/tips/today/", headers=headers, timeout=15)
         soup = BeautifulSoup(r.text, 'html.parser')
 
-        tip_blocks = soup.find_all(['div', 'article', 'li'], class_=lambda x: x and ('tip' in x.lower() or 'bet' in x.lower() or 'horse' in x.lower()))
-        for block in tip_blocks[:5]:
-            horse_tag = block.find(['span', 'a', 'h3'], string=lambda t: t and any(word in t.lower() for word in ['horse', 'runner', 'win']))
-            horse = horse_tag.text.strip() if horse_tag else block.text.strip()[:50]
+        # Broader search for horse names (look for patterns like "Horse to win" or "@ odds")
+        potential_horses = soup.find_all(['span', 'a', 'p', 'div', 'li'], string=lambda t: t and any(word in t.lower() for word in ['horse', 'runner', 'to win', '@', 'odds', 'tip', 'nap']))
+        for el in potential_horses[:5]:
+            text = el.text.strip()
+            if len(text) < 5 or " " not in text:
+                continue
+            horse = text.split(' ')[0].strip() + " " + text.split(' ')[1].strip() if len(text.split()) > 1 else text[:30]
             races.append({
                 "time": "TBD",
                 "track": "GG Tips",
                 "horse": horse,
                 "odds": "TBD",
                 "ai_score": 80,
-                "explanation": "Live scraped tip from GG.co.uk",
+                "explanation": "Live scraped potential tip from GG.co.uk (text match)",
                 "highlighted": True
+            })
+
+        if not races:
+            races.append({
+                "horse": "No tips found",
+                "odds": "N/A",
+                "ai_score": 0,
+                "explanation": "No matching text patterns on GG - page may be JS-heavy or selector needs update (2026 version)",
+                "highlighted": False
             })
     except Exception as e:
         races.append({
@@ -66,6 +79,7 @@ def scrape_tips():
             "explanation": str(e)[:150],
             "highlighted": False
         })
+
     return races
 
 if __name__ == "__main__":
