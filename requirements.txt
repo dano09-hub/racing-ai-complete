@@ -1,1 +1,2 @@
-fastapi uvicorn pandas requests scikit-learn xgboost lightgbm sqlalchemy joblib beautifulsoup4 lxml python-dotenv selenium betfairlightweight webdriver-manager python-telegram-bot plotly
+fastapi
+uvicorn[standard]
