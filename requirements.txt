@@ -1,4 +1,6 @@
-selenium
-webdriver-manager
+fastapi
+uvicorn[standard]
+requests
 beautifulsoup4
 lxml
+playwright
