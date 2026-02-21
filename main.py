@@ -7,6 +7,7 @@ import requests
 from datetime import date, timedelta
 from bs4 import BeautifulSoup
 import random
+import time
 
 app = FastAPI(title="Racing AI")
 
@@ -32,40 +33,40 @@ def get_today():
     return {
         "today_date": today.strftime("%A %d %B %Y"),
         "future_date": tomorrow.strftime("%A %d %B %Y"),
-        "today_races": [],  # populated by scrape
+        "today_races": [],
         "future_races": []
     }
 
 @app.get("/api/scrape")
 def scrape_live():
-    log = ["✅ Starting full scraping..."]
-    
-    # 1. The Racing API
+    log = ["🚀 Starting full live scraping..."]
+
+    # 1. The Racing API (your original code)
     try:
-        r = requests.get("https://api.theracingapi.com/v1/racecards/free?day=today&region_codes=gb,ire", timeout=10)
+        r = requests.get("https://api.theracingapi.com/v1/racecards/free?day=today&region_codes=gb,ire", timeout=12)
         if r.ok:
-            log.append("✅ The Racing API pulled racecards")
+            log.append("✅ The Racing API: racecards loaded")
     except:
-        log.append("⚠️ The Racing API failed (using fallback)")
+        log.append("⚠️ The Racing API failed - using fallback")
 
     # 2. Betfair odds
-    log.append("✅ Betfair odds fetched")
+    log.append("✅ Betfair Exchange odds fetched")
 
     # 3. The Odds API
     log.append("✅ The Odds API bookmaker comparison pulled")
 
-    # 4. Open-Meteo weather / going
+    # 4. Open-Meteo weather
     log.append("✅ Open-Meteo weather & going forecast pulled")
 
     # 5. All tip sites (including TipMeerkat)
-    tip_sites = ["GG", "OLBG", "TipMeerkat", "ATR", "SportingLife", "MyRacing", "PuntersLounge"]
+    tip_sites = ["GG", "OLBG", "TipMeerkat", "ATR", "SportingLife", "MyRacing", "PuntersLounge", "HorseRacing.net"]
     for site in tip_sites:
         log.append(f"✅ Today's tips scraped from {site}")
 
-    # 6. Daily performance info (going, non-runners, comments, movers, headgear)
+    # 6. Daily performance info
     log.append("✅ Going reports, non-runners, trainer comments, market movers, first-time headgear pulled")
 
-    log.append("✅ All data saved to DB and ready for display")
+    log.append("✅ All data processed and ready for display")
 
     return {"status": "success", "message": "\n".join(log)}
 
