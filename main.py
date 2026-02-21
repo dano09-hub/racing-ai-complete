@@ -7,8 +7,6 @@ import requests
 from datetime import date, timedelta
 from bs4 import BeautifulSoup
 from requests_html import HTMLSession
-import time
-import random
 
 app = FastAPI(title="Racing AI")
 
@@ -31,54 +29,45 @@ async def home():
 def get_today():
     today = date.today()
     tomorrow = today + timedelta(days=1)
+
+    # Run scraping here for simplicity (in production, run it separately/cron)
+    scraped_data = scrape_data()
+
     return {
         "today_date": today.strftime("%A %d %B %Y"),
         "future_date": tomorrow.strftime("%A %d %B %Y"),
-        "today_races": [],  # populated after scrape
+        "today_races": scraped_data["today_races"],
         "future_races": []
     }
 
-@app.get("/api/scrape")
-def scrape_live():
-    log = ["🚀 Starting live scraping with requests-html..."]
+def scrape_data():
+    log = []
+    today_races = []
 
     session = HTMLSession()
 
-    # The Racing API
-    try:
-        user = os.getenv('THE_RACING_API_USER')
-        pw = os.getenv('THE_RACING_API_PASS')
-        if user and pw:
-            r = session.get("https://api.theracingapi.com/v1/racecards/free?day=today&region_codes=gb,ire", auth=(user, pw), timeout=12)
-            if r.ok:
-                log.append("✅ The Racing API: racecards loaded")
-            else:
-                log.append(f"⚠️ The Racing API status: {r.status_code}")
-        else:
-            log.append("⚠️ Missing The Racing API credentials")
-    except Exception as e:
-        log.append(f"⚠️ The Racing API error: {str(e)[:100]}")
-
-    # TipMeerkat
-    try:
-        r = session.get("https://tipmeerkat.com/latest-tips-picks", timeout=15)
-        r.html.render(timeout=20, sleep=2)
-        soup = BeautifulSoup(r.html.html, 'html.parser')
-        log.append("✅ TipMeerkat scraped")
-    except Exception as e:
-        log.append(f"⚠️ TipMeerkat error: {str(e)[:100]}")
-
-    # GG tips
+    # Example scraping - replace with your full sites
     try:
         r = session.get("https://gg.co.uk/tips/today/", timeout=15)
         r.html.render(timeout=20, sleep=2)
+        soup = BeautifulSoup(r.html.html, 'html.parser')
+        tips = soup.find_all('div', class_='tip')  # adjust selector
+        for tip in tips[:3]:  # limit for demo
+            horse = tip.find('span', class_='horse').text if tip.find('span', class_='horse') else "Unknown"
+            today_races.append({
+                "time": "14:30",
+                "track": "Ascot",
+                "horse": horse,
+                "odds": "5.0",
+                "ai_score": 85,
+                "explanation": "Scraped tip from GG",
+                "highlighted": True
+            })
         log.append("✅ GG tips scraped")
     except Exception as e:
-        log.append(f"⚠️ GG error: {str(e)[:100]}")
+        log.append(f"⚠️ Scraping error: {str(e)}")
 
-    log.append("✅ All scraping finished")
-
-    return {"status": "success", "message": "\n".join(log)}
+    return {"today_races": today_races, "log": log}
 
 if __name__ == "__main__":
     import uvicorn
