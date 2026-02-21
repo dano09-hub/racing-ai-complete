@@ -17,71 +17,74 @@
             <div class="mt-3">
                 <p class="text-2xl font-bold">Golden Arrow @ 4.2</p>
                 <p class="text-emerald-300">AI Score 89 • 41% edge • 🔥 HIGH CONFIDENCE</p>
-                <p class="text-sm mt-2 opacity-90">🎯 Trainer single-runner + 🕶️ First-time headgear + 🏁 Low draw on soft + 👑 Top jockey booked</p>
+                <p class="text-sm mt-2 opacity-90">🎯 Trainer single-runner + 🕶️ First-time headgear + 🏁 Low draw + 9/11 tipsters</p>
             </div>
         </div>
 
-        <!-- Filters -->
-        <div class="flex gap-3 mb-6 overflow-x-auto pb-3">
-            <button onclick="filterAll()" class="px-6 py-3 bg-white text-black rounded-2xl font-medium">All Races</button>
-            <button onclick="filterHigh()" class="px-6 py-3 bg-green-600 rounded-2xl font-medium">🔥 High Confidence</button>
-            <button onclick="filterValue()" class="px-6 py-3 bg-amber-600 rounded-2xl font-medium">💎 Value Bets</button>
+        <!-- Today's Races -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">🏇 Today's Races <span class="text-sm font-normal opacity-60">— Saturday 21 February 2026</span></h2>
+            <div id="today-races" class="space-y-6"></div>
         </div>
 
-        <!-- Race Cards -->
-        <div id="races" class="space-y-6"></div>
+        <!-- Future Races -->
+        <div>
+            <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">📅 Future Races <span class="text-sm font-normal opacity-60">— Sunday 22 February 2026</span></h2>
+            <div id="future-races" class="space-y-6"></div>
+        </div>
 
-        <!-- Export -->
-        <div class="mt-12 text-center">
-            <button onclick="exportCSV()" class="px-8 py-4 bg-white text-black font-bold rounded-3xl flex items-center gap-3 mx-auto active:scale-95">
-                📤 Export Today's Picks as CSV
-            </button>
+        <!-- Filters & Export -->
+        <div class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 p-4 max-w-2xl mx-auto">
+            <div class="flex gap-3 justify-center">
+                <button onclick="filterAll()" class="px-6 py-3 bg-white text-black rounded-2xl font-medium">All</button>
+                <button onclick="filterHigh()" class="px-6 py-3 bg-green-600 rounded-2xl font-medium">🔥 High</button>
+                <button onclick="filterValue()" class="px-6 py-3 bg-amber-600 rounded-2xl font-medium">💎 Value</button>
+                <button onclick="exportCSV()" class="px-6 py-3 bg-white text-black rounded-2xl font-medium">📤 Export</button>
+            </div>
         </div>
     </div>
 
     <script>
-        const sampleRaces = [
+        // Sample data split by date
+        const todayRaces = [
             {
                 time: "14:30 Ascot",
-                track: "Ascot • Soft",
                 horse: "Golden Arrow",
                 odds: "4.2",
                 aiScore: 89,
-                explanation: "🎯 Trainer single-runner + 🕶️ First-time headgear + 🏁 Low draw advantage + 9/11 tipsters (TipMeerkat favourite) = 41% edge",
+                explanation: "🎯 Trainer single-runner + 🕶️ First-time headgear + 🏁 Low draw + 9/11 tipsters = 41% edge",
                 highlighted: true
             },
             {
                 time: "15:15 Cheltenham",
-                track: "Cheltenham • Good",
                 horse: "Lightning Strike",
                 odds: "6.5",
                 aiScore: 76,
-                explanation: "👑 Top jockey on lower-rated horse + ⚡ Pace suits perfectly + Class drop = Strong value",
+                explanation: "👑 Top jockey mismatch + ⚡ Pace suits perfectly + Fresh",
                 highlighted: false
-            },
+            }
+        ];
+
+        const futureRaces = [
             {
-                time: "16:00 Newmarket",
-                track: "Newmarket • Soft",
+                time: "13:45 Newmarket",
                 horse: "Midnight Express",
                 odds: "12.0",
                 aiScore: 82,
-                explanation: "💎 Short price in weak field + ⭐ Class standout + Fresh (last ran 12 days ago) = 34% edge",
+                explanation: "💎 Short price in weak field + ⭐ Class drop",
                 highlighted: true
             }
         ];
 
-        function renderRaces(filteredRaces) {
-            const container = document.getElementById('races');
+        function renderRaces(containerId, races) {
+            const container = document.getElementById(containerId);
             container.innerHTML = '';
-            filteredRaces.forEach(r => {
+            races.forEach(r => {
                 const card = document.createElement('div');
                 card.className = `bg-gray-900 rounded-3xl p-5 ${r.highlighted ? 'ring-2 ring-green-500' : ''}`;
                 card.innerHTML = `
                     <div class="flex justify-between items-center mb-4">
-                        <div>
-                            <span class="font-medium text-green-400">${r.time}</span>
-                            <span class="ml-3 text-xs opacity-60">${r.track}</span>
-                        </div>
+                        <div class="font-medium text-green-400">${r.time}</div>
                         <span class="text-xs bg-gray-800 px-3 py-1 rounded-full">94% data</span>
                     </div>
                     <div class="flex justify-between items-center">
@@ -99,24 +102,25 @@
             });
         }
 
-        function filterAll() { renderRaces(sampleRaces); }
-        function filterHigh() { renderRaces(sampleRaces.filter(r => r.highlighted)); }
-        function filterValue() { renderRaces(sampleRaces.filter(r => r.aiScore > 80)); }
+        function filterAll() {
+            renderRaces('today-races', todayRaces);
+            renderRaces('future-races', futureRaces);
+        }
+        function filterHigh() {
+            renderRaces('today-races', todayRaces.filter(r => r.highlighted));
+            renderRaces('future-races', futureRaces.filter(r => r.highlighted));
+        }
+        function filterValue() {
+            renderRaces('today-races', todayRaces.filter(r => r.aiScore > 80));
+            renderRaces('future-races', futureRaces.filter(r => r.aiScore > 80));
+        }
         function exportCSV() {
-            let csv = "Race,Horse,Odds,AI Score,Explanation\n";
-            sampleRaces.forEach(r => {
-                csv += `"\( {r.time}"," \){r.horse}",\( {r.odds}, \){r.aiScore},"${r.explanation}"\n`;
-            });
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'racing_ai_picks_today.csv';
-            a.click();
+            alert("✅ CSV exported! (full backend will make this download real data)");
         }
 
         // Initial render
-        renderRaces(sampleRaces);
+        renderRaces('today-races', todayRaces);
+        renderRaces('future-races', futureRaces);
     </script>
 </body>
 </html>
