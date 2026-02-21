@@ -3,5 +3,3 @@ uvicorn[standard]
 requests
 beautifulsoup4
 lxml
-requests-html
-lxml_html_clean
