@@ -1,5 +1,4 @@
-fastapi
-uvicorn[standard]
-requests
+selenium
+webdriver-manager
 beautifulsoup4
 lxml
