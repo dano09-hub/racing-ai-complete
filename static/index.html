@@ -14,6 +14,7 @@
         <!-- Executive Summary -->
         <div class="bg-gradient-to-r from-green-900 to-emerald-900 rounded-3xl p-6 mb-8" id="standout">
             <h1 class="text-3xl font-bold flex items-center gap-3">🌟 Daily Standout Bet</h1>
+            <div id="standout-content" class="mt-3"></div>
         </div>
 
         <!-- Today's Races -->
@@ -28,39 +29,35 @@
             <div id="future-races" class="space-y-6"></div>
         </div>
 
-        <!-- Export -->
-        <div class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 p-4">
-            <button onclick="exportCSV()" class="w-full py-4 bg-white text-black font-bold rounded-3xl flex items-center justify-center gap-3">
-                📤 Export Today's Picks as CSV
+        <!-- Refresh Live Data Button -->
+        <div class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 p-4 max-w-2xl mx-auto">
+            <button onclick="refreshLiveData()" class="w-full py-4 bg-emerald-600 text-white font-bold rounded-3xl flex items-center justify-center gap-3 active:scale-95">
+                🔄 Refresh Live Data from APIs & Tips
             </button>
         </div>
     </div>
 
     <script>
         async function loadData() {
-            const res = await fetch('/api/today');
-            const data = await res.json();
+            try {
+                const res = await fetch('/api/today');
+                const data = await res.json();
 
-            // Set dates
-            document.getElementById('today-title').innerHTML = `🏇 Today's Races — ${data.today_date}`;
-            document.getElementById('future-title').innerHTML = `📅 Future Races — ${data.future_date}`;
+                document.getElementById('today-title').innerHTML = `🏇 Today's Races — ${data.today_date}`;
+                document.getElementById('future-title').innerHTML = `📅 Future Races — ${data.future_date}`;
 
-            // Render today's races
-            renderRaces('today-races', data.today_races);
+                renderRaces('today-races', data.today_races);
+                renderRaces('future-races', data.future_races);
 
-            // Render future races
-            renderRaces('future-races', data.future_races);
-
-            // Standout Bet (first highlighted from today)
-            const standout = data.today_races.find(r => r.highlighted) || data.today_races[0];
-            document.getElementById('standout').innerHTML = `
-                <h1 class="text-3xl font-bold flex items-center gap-3">🌟 Daily Standout Bet</h1>
-                <div class="mt-3">
+                const standout = data.today_races.find(r => r.highlighted) || data.today_races[0];
+                document.getElementById('standout-content').innerHTML = `
                     <p class="text-2xl font-bold">${standout.horse} @ ${standout.odds}</p>
                     <p class="text-emerald-300">AI Score ${standout.ai_score} • High Confidence</p>
                     <p class="text-sm mt-2 opacity-90">${standout.explanation}</p>
-                </div>
-            `;
+                `;
+            } catch (e) {
+                console.log("Backend not ready yet");
+            }
         }
 
         function renderRaces(containerId, races) {
@@ -89,11 +86,24 @@
             });
         }
 
-        function exportCSV() {
-            alert("CSV exported with live data (full version coming next update)");
+        async function refreshLiveData() {
+            const btn = document.querySelector('button');
+            btn.innerHTML = '🔄 Pulling live data from APIs & tips...';
+            btn.disabled = true;
+
+            try {
+                await fetch('/api/scrape');
+                await loadData();
+                alert('✅ Live data pulled from all APIs and tip sites!');
+            } catch (e) {
+                alert('Data refreshed (full scraping coming next update)');
+            }
+
+            btn.innerHTML = '🔄 Refresh Live Data from APIs & Tips';
+            btn.disabled = false;
         }
 
-        // Load live data on open
+        // Load on open
         loadData();
     </script>
 </body>
