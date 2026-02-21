@@ -1,65 +1,46 @@
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
-import os
-import requests
-from datetime import date, timedelta
-from bs4 import BeautifulSoup
-
-app = FastAPI(title="Racing AI")
-
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.get("/", response_class=HTMLResponse)
-async def home():
-    with open("static/index.html") as f:
-        return f.read()
-
-@app.get("/api/today")
-def get_today():
-    today = date.today()
-    tomorrow = today + timedelta(days=1)
-
-    scraped = scrape_tips()
-
-    return {
-        "today_date": today.strftime("%A %d %B %Y"),
-        "future_date": tomorrow.strftime("%A %d %B %Y"),
-        "today_races": scraped,
-        "future_races": []
-    }
-
 def scrape_tips():
     races = []
     try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
         r = requests.get("https://gg.co.uk/tips/today/", headers=headers, timeout=15)
         soup = BeautifulSoup(r.text, 'html.parser')
 
-        # Broad search for horse names on GG 2026 page
-        potential = soup.find_all(string=lambda t: t and any(word in t.lower() for word in ['horse', 'runner', 'tip', 'nap', '@', 'odds']))
-        for text in potential[:5]:
-            text = text.strip()
-            if len(text) < 10 or ' ' not in text:
-                continue
-            horse = text.split(' ')[0] + " " + text.split(' ')[1] if len(text.split()) > 1 else text[:30]
+        # More precise: look for tip containers or text with horse/odds patterns
+        tip_containers = soup.find_all(['div', 'section', 'article'], class_=lambda x: x and ('tip' in x.lower() or 'selection' in x.lower() or 'bet' in x.lower()))
+        if not tip_containers:
+            tip_containers = soup.find_all('div', recursive=True)  # fallback broad search
+
+        for container in tip_containers[:5]:
+            # Clean text - remove style/script tags
+            for tag in container.find_all(['style', 'script']):
+                tag.decompose()
+            text = container.get_text(separator=' ', strip=True)
+
+            # Extract horse-like phrase (e.g. "Horse Name @ 5/1")
+            if '@' in text or ' to win' in text.lower() or 'tip' in text.lower():
+                parts = text.split('@') if '@' in text else text.split(' to win')
+                horse_part = parts[0].strip()[-30:]  # take last part before @
+                horse = horse_part.split()[-2:] if len(horse_part.split()) > 1 else horse_part
+                horse = ' '.join(horse) if isinstance(horse, list) else horse
+                odds = parts[1].strip()[:10] if len(parts) > 1 else "TBD"
+
+                races.append({
+                    "time": "TBD",
+                    "track": "GG Tips",
+                    "horse": horse or "Unknown Horse",
+                    "odds": odds,
+                    "ai_score": 80,
+                    "explanation": "Live scraped tip from GG.co.uk (cleaned text match)",
+                    "highlighted": True
+                })
+
+        if not races:
             races.append({
-                "time": "TBD",
-                "track": "GG Tips",
-                "horse": horse,
-                "odds": "TBD",
-                "ai_score": 80,
-                "explanation": "Live scraped tip from GG.co.uk",
-                "highlighted": True
+                "horse": "No tips found",
+                "odds": "N/A",
+                "ai_score": 0,
+                "explanation": "No horse/odds patterns on GG - page is JS-heavy or content blocked (2026 version)",
+                "highlighted": False
             })
     except Exception as e:
         races.append({
@@ -71,8 +52,3 @@ def scrape_tips():
         })
 
     return races
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
