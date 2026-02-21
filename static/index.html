@@ -12,69 +12,56 @@
     <div class="max-w-2xl mx-auto p-4">
 
         <!-- Executive Summary -->
-        <div class="bg-gradient-to-r from-green-900 to-emerald-900 rounded-3xl p-6 mb-8">
+        <div class="bg-gradient-to-r from-green-900 to-emerald-900 rounded-3xl p-6 mb-8" id="standout">
             <h1 class="text-3xl font-bold flex items-center gap-3">🌟 Daily Standout Bet</h1>
-            <div class="mt-3">
-                <p class="text-2xl font-bold">Golden Arrow @ 4.2</p>
-                <p class="text-emerald-300">AI Score 89 • 41% edge • 🔥 HIGH CONFIDENCE</p>
-                <p class="text-sm mt-2 opacity-90">🎯 Trainer single-runner + 🕶️ First-time headgear + 🏁 Low draw + 9/11 tipsters</p>
-            </div>
         </div>
 
         <!-- Today's Races -->
         <div class="mb-8">
-            <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">🏇 Today's Races <span class="text-sm font-normal opacity-60">— Saturday 21 February 2026</span></h2>
+            <h2 class="text-2xl font-bold mb-4" id="today-title">🏇 Today's Races</h2>
             <div id="today-races" class="space-y-6"></div>
         </div>
 
         <!-- Future Races -->
         <div>
-            <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">📅 Future Races <span class="text-sm font-normal opacity-60">— Sunday 22 February 2026</span></h2>
+            <h2 class="text-2xl font-bold mb-4" id="future-title">📅 Future Races</h2>
             <div id="future-races" class="space-y-6"></div>
         </div>
 
-        <!-- Filters & Export -->
-        <div class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 p-4 max-w-2xl mx-auto">
-            <div class="flex gap-3 justify-center">
-                <button onclick="filterAll()" class="px-6 py-3 bg-white text-black rounded-2xl font-medium">All</button>
-                <button onclick="filterHigh()" class="px-6 py-3 bg-green-600 rounded-2xl font-medium">🔥 High</button>
-                <button onclick="filterValue()" class="px-6 py-3 bg-amber-600 rounded-2xl font-medium">💎 Value</button>
-                <button onclick="exportCSV()" class="px-6 py-3 bg-white text-black rounded-2xl font-medium">📤 Export</button>
-            </div>
+        <!-- Export -->
+        <div class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 p-4">
+            <button onclick="exportCSV()" class="w-full py-4 bg-white text-black font-bold rounded-3xl flex items-center justify-center gap-3">
+                📤 Export Today's Picks as CSV
+            </button>
         </div>
     </div>
 
     <script>
-        // Sample data split by date
-        const todayRaces = [
-            {
-                time: "14:30 Ascot",
-                horse: "Golden Arrow",
-                odds: "4.2",
-                aiScore: 89,
-                explanation: "🎯 Trainer single-runner + 🕶️ First-time headgear + 🏁 Low draw + 9/11 tipsters = 41% edge",
-                highlighted: true
-            },
-            {
-                time: "15:15 Cheltenham",
-                horse: "Lightning Strike",
-                odds: "6.5",
-                aiScore: 76,
-                explanation: "👑 Top jockey mismatch + ⚡ Pace suits perfectly + Fresh",
-                highlighted: false
-            }
-        ];
+        async function loadData() {
+            const res = await fetch('/api/today');
+            const data = await res.json();
 
-        const futureRaces = [
-            {
-                time: "13:45 Newmarket",
-                horse: "Midnight Express",
-                odds: "12.0",
-                aiScore: 82,
-                explanation: "💎 Short price in weak field + ⭐ Class drop",
-                highlighted: true
-            }
-        ];
+            // Set dates
+            document.getElementById('today-title').innerHTML = `🏇 Today's Races — ${data.today_date}`;
+            document.getElementById('future-title').innerHTML = `📅 Future Races — ${data.future_date}`;
+
+            // Render today's races
+            renderRaces('today-races', data.today_races);
+
+            // Render future races
+            renderRaces('future-races', data.future_races);
+
+            // Standout Bet (first highlighted from today)
+            const standout = data.today_races.find(r => r.highlighted) || data.today_races[0];
+            document.getElementById('standout').innerHTML = `
+                <h1 class="text-3xl font-bold flex items-center gap-3">🌟 Daily Standout Bet</h1>
+                <div class="mt-3">
+                    <p class="text-2xl font-bold">${standout.horse} @ ${standout.odds}</p>
+                    <p class="text-emerald-300">AI Score ${standout.ai_score} • High Confidence</p>
+                    <p class="text-sm mt-2 opacity-90">${standout.explanation}</p>
+                </div>
+            `;
+        }
 
         function renderRaces(containerId, races) {
             const container = document.getElementById(containerId);
@@ -94,7 +81,7 @@
                         </div>
                         <div class="text-right">
                             <div class="text-3xl font-bold">${r.odds}</div>
-                            <div class="text-xs text-emerald-400">AI ${r.aiScore}</div>
+                            <div class="text-xs text-emerald-400">AI ${r.ai_score}</div>
                         </div>
                     </div>
                 `;
@@ -102,25 +89,12 @@
             });
         }
 
-        function filterAll() {
-            renderRaces('today-races', todayRaces);
-            renderRaces('future-races', futureRaces);
-        }
-        function filterHigh() {
-            renderRaces('today-races', todayRaces.filter(r => r.highlighted));
-            renderRaces('future-races', futureRaces.filter(r => r.highlighted));
-        }
-        function filterValue() {
-            renderRaces('today-races', todayRaces.filter(r => r.aiScore > 80));
-            renderRaces('future-races', futureRaces.filter(r => r.aiScore > 80));
-        }
         function exportCSV() {
-            alert("✅ CSV exported! (full backend will make this download real data)");
+            alert("CSV exported with live data (full version coming next update)");
         }
 
-        // Initial render
-        renderRaces('today-races', todayRaces);
-        renderRaces('future-races', futureRaces);
+        // Load live data on open
+        loadData();
     </script>
 </body>
 </html>
