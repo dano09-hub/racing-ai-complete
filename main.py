@@ -2,11 +2,15 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from playwright.sync_api import sync_playwright
-from bs4 import BeautifulSoup
-from datetime import date, timedelta
+from dotenv import load_dotenv
 import os
-import random  # For simulated score/probability
+import requests
+from datetime import date, timedelta
+from bs4 import BeautifulSoup
+
+load_dotenv()
+
+print("Loaded HEADLESS_BROWSER_URL:", os.getenv('HEADLESS_BROWSER_URL'))
 
 app = FastAPI(title="Racing AI")
 
@@ -33,113 +37,79 @@ def get_today():
     today = date.today()
     tomorrow = today + timedelta(days=1)
 
-    scraped = scrape_all_sites()
-
-    # Vet picks: simple consensus + anomaly boost
-    for key in scraped:
-        for item in scraped[key]:
-            consensus = random.randint(2, 8)  # Simulate source count
-            anomaly_boost = 20 if "anomaly" in item["explanation"].lower() else 0
-            item["ai_score"] = min(100, 50 + consensus * 6 + anomaly_boost)
-            item["probability"] = f"{max(40, item['ai_score'] - 25)}-{min(90, item['ai_score'])}%"
-            item["explanation"] += f" | Chosen above others: {consensus} sources agree + strong form/anomalies"
+    scraped = scrape_tips()
 
     return {
         "today_date": today.strftime("%A %d %B %Y"),
         "future_date": tomorrow.strftime("%A %d %B %Y"),
-        "pick_of_day": scraped["pick_of_day"],
-        "today_best": scraped["today_best"],
-        "tomorrow_best": scraped["tomorrow_best"],
-        "look_at_these": scraped["look_at_these"],
-        "anomalies": scraped["anomalies"]
+        "today_races": scraped,
+        "future_races": [],
+        "log": "Scraping completed via headless browser"
     }
 
-def scrape_all_sites():
-    data = {
-        "pick_of_day": [],
-        "today_best": [],
-        "tomorrow_best": [],
-        "look_at_these": [],
-        "anomalies": []
+@app.get("/api/scrape")
+def scrape_live():
+    scraped = scrape_tips()
+    return {
+        "status": "success",
+        "message": "Scraping completed via headless browser",
+        "races": scraped
     }
 
-    urls = [
-        "https://gg.co.uk/tips/today/",
-        "https://tipmeerkat.com/latest-tips-picks",
-        "https://www.olbg.com/betting-tips/Horse_Racing/2",
-        "https://www.attheraces.com/tips",
-        "https://www.racingpost.com/tips",
-        "https://www.sportinglife.com/racing/tips-centre"
-    ]
+def scrape_tips():
+    races = []
+    headless_url = os.getenv('HEADLESS_BROWSER_URL')
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+    if not headless_url:
+        races.append({
+            "horse": "Config Error",
+            "explanation": "HEADLESS_BROWSER_URL variable is missing",
+            "highlighted": False
+        })
+        return races
 
-        for url in urls:
-            try:
-                page.goto(url, timeout=60000)
-                page.wait_for_load_state("networkidle", timeout=30000)
-                html = page.content()
-                soup = BeautifulSoup(html, 'html.parser')
+    try:
+        payload = {
+            "url": "https://gg.co.uk/tips/today/",
+            "instructions": "Extract all horse names, odds, times, tracks, and explanations. Return as JSON list of objects with keys: horse, odds, time, track, explanation."
+        }
+        r = requests.post(f"{headless_url}/scrape", json=payload, timeout=40)
 
-                # Clean soup
-                for tag in soup(['script', 'style']):
-                    tag.decompose()
+        if r.ok:
+            result = r.json()
+            for item in result.get("results", [])[:8]:
+                races.append({
+                    "time": item.get("time", "TBD"),
+                    "track": item.get("track", "Various"),
+                    "horse": item.get("horse", "Unknown"),
+                    "odds": item.get("odds", "TBD"),
+                    "ai_score": 80,
+                    "explanation": item.get("explanation", "Scraped via headless browser"),
+                    "highlighted": len(races) < 3
+                })
+        else:
+            races.append({
+                "horse": "Headless Error",
+                "explanation": f"Status {r.status_code} - {r.text[:100]}",
+                "highlighted": False
+            })
+    except Exception as e:
+        races.append({
+            "horse": "Connection Error",
+            "explanation": str(e)[:150],
+            "highlighted": False
+        })
 
-                # Extract tips (broad match for horse/tip text)
-                text_blocks = soup.find_all(['div', 'p', 'span', 'li'], string=lambda t: t and any(
-                    word in t.lower() for word in ['horse', 'runner', 'nap', 'tip', 'best bet', '@', 'odds', 'to win']
-                ))
+    if not races:
+        races.append({
+            "horse": "No tips found",
+            "explanation": "Headless service returned no data",
+            "highlighted": False
+        })
 
-                for block in text_blocks[:8]:
-                    text = block.get_text(strip=True)
-                    if len(text) < 12:
-                        continue
-
-                    # Extract horse (first few words before tip words)
-                    words = text.split()
-                    end = next((i for i, w in enumerate(words) if w.lower() in ['to', 'win', '@', 'odds', 'tip']), len(words))
-                    horse = ' '.join(words[:end])[:60].strip()
-
-                    if len(horse) > 5 and 'home' not in horse.lower() and 'latest' not in horse.lower():
-                        item = {
-                            "horse": horse,
-                            "track": "Various",
-                            "odds": "TBD",
-                            "ai_score": 78,
-                            "probability": "65-85%",
-                            "explanation": f"Live scraped tip from {url.split('//')[1].split('/')[0]} - strong consensus",
-                            "highlighted": False
-                        }
-                        data["today_best"].append(item)
-                        data["look_at_these"].append(item)
-            except:
-                continue
-
-        browser.close()
-
-    # Pick of the Day = first good one
-    if data["today_best"]:
-        data["pick_of_day"] = [data["today_best"][0]]
-        data["pick_of_day"][0]["highlighted"] = True
-        data["pick_of_day"][0]["explanation"] = "Chosen above all others due to strongest consensus, anomalies, and form match"
-
-    # Add anomaly examples
-    data["anomalies"] = [
-        {"horse": "Example Horse", "explanation": "🎯 Trainer has only one runner today - strong intent", "highlighted": True},
-        {"horse": "Example Horse", "explanation": "🕶️ First-time headgear - often massive improver", "highlighted": True},
-        {"horse": "Example Horse", "explanation": "💎 Odds shorter than expected - market confidence", "highlighted": True},
-        {"horse": "Example Horse", "explanation": "⭐ Dropping in class - easier race today", "highlighted": True},
-    ]
-
-    # Limit for readability
-    for key in data:
-        if key != "anomalies":
-            data[key] = data[key][:8]
-
-    return data
+    return races
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
