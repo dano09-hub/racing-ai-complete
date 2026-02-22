@@ -1,32 +1,16 @@
 # main.py
 import logging
 from datetime import datetime
-from typing import Any
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
-# Optional: if you're really using RSS from Racing Post
-try:
-    import feedparser
-except ImportError:
-    feedparser = None
-    logging.warning("feedparser not installed - RSS features will be disabled")
-
-# Playwright - async version
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
 
-app = FastAPI(
-    title="Scraper API",
-    description="Simple scraping & today endpoint",
-    version="0.1.0"
-)
+app = FastAPI(title="Scraper API")
 
-# Allow frontend (adjust origins in production!)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],           # ← tighten this in prod!
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,27 +26,17 @@ class ScrapeResponse(BaseModel):
     timestamp: str
 
 
-@app.get("/api/today", response_model=dict)
+@app.get("/api/today")
 async def get_today():
-    """Simple endpoint that returns current date/time"""
     now = datetime.utcnow()
-    return {
-        "today": now.strftime("%Y-%m-%d"),
-        "utc_datetime": now.isoformat(),
-        "message": "Hello from today endpoint"
-    }
+    return {"today": now.strftime("%Y-%m-%d"), "utc_datetime": now.isoformat()}
 
 
 @app.get("/api/scrape", response_model=ScrapeResponse)
 @app.get("/api/scrape/{url:path}", response_model=ScrapeResponse)
 async def scrape_url(url: str | None = None):
-    """
-    Scrape a webpage using Playwright (headless Chromium).
-    Example: /api/scrape?url=https://example.com
-    """
     if not url:
         raise HTTPException(status_code=400, detail="Missing ?url= parameter")
-
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
 
@@ -72,7 +46,7 @@ async def scrape_url(url: str | None = None):
         "title": None,
         "content_snippet": None,
         "error": None,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
     try:
@@ -80,24 +54,40 @@ async def scrape_url(url: str | None = None):
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page(
                 viewport={"width": 1280, "height": 800},
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
-                )
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             )
 
-            try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=45000)
-            except PlaywrightTimeout:
-                result["error"] = "Timeout while loading page"
-                await browser.close()
-                return result
+            await page.goto(url, wait_until="domcontentloaded", timeout=45000)
 
-            try:
-                title = await page.title()
-                result["title"] = title.strip() if title else None
-            except Exception:
-                result["title"] = None
+            title = await page.title()
+            result["title"] = title.strip() if title else None
 
-            # Example selectors —
+            # Extract main content
+            content = ""
+            for sel in ["article", "main", ".content", "#content", ".post-body"]:
+                elem = page.locator(sel).first
+                if await elem.is_visible():
+                    content = await elem.inner_text()
+                    break
+            if not content:
+                content = await page.inner_text("body")
+
+            content = " ".join(content.split())
+            result["content_snippet"] = content[:500] + ("..." if len(content) > 500 else "")
+            result["success"] = True
+
+            await browser.close()
+    except Exception as e:
+        result["error"] = str(e)
+
+    return result
+
+
+@app.get("/")
+async def root():
+    return {"message": "API running", "scrape_example": "/api/scrape?url=https://example.com"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
