@@ -11,90 +11,94 @@
 <body class="bg-gray-950 text-white min-h-screen pb-20">
     <div class="max-w-2xl mx-auto p-4">
 
-        <h1 class="text-3xl font-bold mb-6">🏇 Racing AI Live</h1>
+        <h1 class="text-3xl font-bold mb-8 flex items-center gap-3">🏇 Racing AI Live</h1>
 
-        <div id="standout" class="bg-green-900 rounded-3xl p-6 mb-8"></div>
+        <!-- Tabs -->
+        <div class="flex gap-2 overflow-x-auto pb-4 mb-8 border-b border-gray-700">
+            <button onclick="showTab(0)" class="tab-btn active px-6 py-3 rounded-2xl font-medium flex-shrink-0">🌟 Pick of the Day</button>
+            <button onclick="showTab(1)" class="tab-btn px-6 py-3 rounded-2xl font-medium flex-shrink-0">🔥 Today's Best</button>
+            <button onclick="showTab(2)" class="tab-btn px-6 py-3 rounded-2xl font-medium flex-shrink-0">📅 Tomorrow's Best</button>
+            <button onclick="showTab(3)" class="tab-btn px-6 py-3 rounded-2xl font-medium flex-shrink-0">👀 Look at These</button>
+            <button onclick="showTab(4)" class="tab-btn px-6 py-3 rounded-2xl font-medium flex-shrink-0">🚩 Anomalies</button>
+        </div>
 
-        <h2 class="text-2xl font-bold mb-4" id="today-title">🏇 Today's Races</h2>
-        <div id="today-races" class="space-y-6"></div>
+        <!-- Content -->
+        <div id="content" class="space-y-6"></div>
 
-        <h2 class="text-2xl font-bold mb-4 mt-12" id="future-title">📅 Future Races</h2>
-        <div id="future-races" class="space-y-6"></div>
-
-        <div class="fixed bottom-0 left-0 right-0 bg-gray-900 p-4">
-            <button onclick="refreshData()" class="w-full py-4 bg-emerald-600 text-white font-bold rounded-3xl">
-                🔄 Refresh Live Data
+        <!-- Refresh -->
+        <div class="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 p-4 max-w-2xl mx-auto">
+            <button onclick="refreshAll()" class="w-full py-4 bg-emerald-600 text-white font-bold rounded-3xl flex items-center justify-center gap-3 active:scale-95">
+                🔄 Refresh All Data
             </button>
         </div>
     </div>
 
     <script>
-        async function loadData() {
-            try {
-                const res = await fetch('/api/today');
-                const data = await res.json();
+        let currentTab = 0;
+        const tabNames = ["pick_of_day", "today_best", "tomorrow_best", "look_at_these", "anomalies"];
 
-                document.getElementById('today-title').innerText = `🏇 Today's Races — ${data.today_date}`;
-                document.getElementById('future-title').innerText = `📅 Future Races — ${data.future_date}`;
-
-                renderRaces('today-races', data.today_races);
-                renderRaces('future-races', data.future_races);
-
-                const standout = data.today_races.find(r => r.highlighted) || data.today_races[0];
-                if (standout) {
-                    document.getElementById('standout').innerHTML = `
-                        <h1 class="text-3xl font-bold flex items-center gap-3">🌟 Daily Standout Bet</h1>
-                        <div class="mt-3">
-                            <p class="text-2xl font-bold">${standout.horse} @ ${standout.odds}</p>
-                            <p class="text-emerald-300">AI Score ${standout.ai_score}</p>
-                            <p class="text-sm mt-2">${standout.explanation}</p>
-                        </div>
-                    `;
-                }
-            } catch (e) {
-                console.log("Error loading data:", e);
-            }
-        }
-
-        function renderRaces(id, races) {
-            const container = document.getElementById(id);
+        function renderCards(items) {
+            const container = document.getElementById('content');
             container.innerHTML = '';
-            races.forEach(r => {
+            if (items.length === 0) {
+                container.innerHTML = `<p class="text-center text-gray-400 py-12">No data yet. Tap Refresh.</p>`;
+                return;
+            }
+            items.forEach(item => {
                 const card = document.createElement('div');
-                card.className = `bg-gray-900 rounded-3xl p-5 ${r.highlighted ? 'ring-2 ring-green-500' : ''}`;
+                card.className = `bg-gray-900 rounded-3xl p-6 ${item.highlighted ? 'ring-2 ring-green-500' : ''}`;
                 card.innerHTML = `
-                    <div class="flex justify-between mb-2">
-                        <div class="font-medium text-green-400">${r.time}</div>
-                        <span class="text-xs bg-gray-800 px-3 py-1 rounded-full">Live</span>
-                    </div>
-                    <div class="flex justify-between">
+                    <div class="flex justify-between items-start">
                         <div>
-                            <span class="text-xl font-bold">${r.horse}</span>
-                            <div class="text-sm mt-1">${r.explanation}</div>
+                            <span class="text-green-400 font-medium">${item.time || 'TBD'}</span>
+                            <span class="ml-3 text-xs opacity-60">${item.track || 'Various'}</span>
                         </div>
                         <div class="text-right">
-                            <div class="text-3xl font-bold">${r.odds}</div>
-                            <div class="text-xs text-emerald-400">AI ${r.ai_score}</div>
+                            <div class="text-3xl font-bold">${item.odds || 'TBD'}</div>
+                            <div class="text-emerald-400 text-sm">AI ${item.ai_score} • ${item.probability || '??'}%</div>
                         </div>
                     </div>
+                    <div class="mt-4 text-2xl font-bold leading-tight">${item.horse}</div>
+                    <div class="mt-3 text-sm opacity-90 leading-relaxed">${item.explanation}</div>
                 `;
                 container.appendChild(card);
             });
         }
 
-        async function refreshData() {
+        async function loadData() {
+            try {
+                const res = await fetch('/api/today');
+                const data = await res.json();
+                renderCards(data[tabNames[currentTab]] || []);
+            } catch(e) {
+                document.getElementById('content').innerHTML = `<p class="text-red-400">Error loading data. Tap Refresh.</p>`;
+            }
+        }
+
+        async function refreshAll() {
             const btn = document.querySelector('button');
-            btn.innerHTML = '🔄 Pulling live data...';
+            btn.innerHTML = '🔄 Scraping sites...';
             btn.disabled = true;
 
             await fetch('/api/scrape');
             await loadData();
 
-            btn.innerHTML = '🔄 Refresh Live Data';
+            btn.innerHTML = '🔄 Refresh All Data';
             btn.disabled = false;
         }
 
-        loadData();  // load on open
+        function showTab(n) {
+            currentTab = n;
+            document.querySelectorAll('.tab-btn').forEach((b, i) => {
+                b.classList.toggle('active', i === n);
+                b.classList.toggle('bg-emerald-600', i === n);
+                b.classList.toggle('text-white', i === n);
+            });
+            loadData();
+        }
+
+        // Initial load
+        loadData();
     </script>
 </body>
 </html>
