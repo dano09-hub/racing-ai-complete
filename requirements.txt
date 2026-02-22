@@ -1,7 +1,5 @@
 fastapi
 uvicorn[standard]
-requests
-beautifulsoup4
-lxml
+pydantic
 playwright
-feedparser
+# feedparser               ← uncomment only if you actually use it
